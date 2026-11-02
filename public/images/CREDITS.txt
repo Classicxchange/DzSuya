@@ -1,0 +1,10 @@
+Photo credits (images in this folder come from Wikimedia Commons and are cropped and resized):
+
+beef.jpg      "Steak Suya.jpg" by Wikipedianaija, CC BY-SA 4.0 - https://commons.wikimedia.org/wiki/File:Steak_Suya.jpg
+chicken.jpg   "Chicken suya also known as kebab.jpg" by Nakandealiyu, CC BY-SA 4.0 - https://commons.wikimedia.org/wiki/File:Chicken_suya_also_known_as_kebab.jpg
+goat.jpg      "Peppered goat meat.jpg" by Omolarabasirat, CC BY-SA 4.0 - https://commons.wikimedia.org/wiki/File:Peppered_goat_meat.jpg
+fish.jpg      "Street Barbecue Catfish.jpg" by Aderiqueza, CC BY-SA 4.0 - https://commons.wikimedia.org/wiki/File:Street_Barbecue_Catfish.jpg
+special.jpg   "SuyavarietiesTX.JPG" by WhisperToMe, CC0 - https://commons.wikimedia.org/wiki/File:SuyavarietiesTX.JPG
+hero.jpg      "Sichimedia5.jpg" by Sichi Media, CC BY-SA 4.0 - https://commons.wikimedia.org/wiki/File:Sichimedia5.jpg
+
+CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/

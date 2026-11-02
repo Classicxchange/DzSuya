@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: 'DM Sans', ui-sans-serif, sans-serif;
+  background: #16110e;
+  color: #f6ead7;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .display {
+    font-family: 'Space Grotesk', ui-sans-serif, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .surface {
+    background: linear-gradient(180deg, #221a14 0%, #1c1510 100%);
+    border: 1px solid rgba(246, 234, 215, 0.07);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.7);
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, #ff8a3d 0%, #f26b1d 55%, #d9540b 100%);
+    color: #1a0e05;
+    font-weight: 700;
+    box-shadow: 0 10px 30px -10px rgba(242, 107, 29, 0.6), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+    transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+  .btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-ghost {
+    background: rgba(246, 234, 215, 0.06);
+    border: 1px solid rgba(246, 234, 215, 0.12);
+    color: #f6ead7;
+    font-weight: 600;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: rgba(246, 234, 215, 0.11);
+  }
+  .btn-ghost:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+  .btn-ghost:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .focus-ring:focus-visible {
+    outline: 2px solid #ffb877;
+    outline-offset: 2px;
+  }
+  .grain {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 3px 3px;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
