@@ -14,7 +14,18 @@ export function useShopWallet() {
     abi: SHOP_ABI,
     functionName: 'shop',
     chainId: CHAIN_ID,
-    query: { enabled: !!SHOP_ADDRESS, staleTime: 60_000 },
+    query: { enabled: !!SHOP_ADDRESS, staleTime: 10_000, refetchInterval: 15_000 },
+  })
+}
+
+/** Wallet proposed to take over the shop, if a handover is in progress. */
+export function usePendingShop() {
+  return useReadContract({
+    address: SHOP_ADDRESS,
+    abi: SHOP_ABI,
+    functionName: 'pendingShop',
+    chainId: CHAIN_ID,
+    query: { enabled: !!SHOP_ADDRESS, staleTime: 10_000, refetchInterval: 15_000 },
   })
 }
 
@@ -77,7 +88,7 @@ export function useOrderTx(id: bigint | undefined) {
   return useQuery({
     queryKey: ['order-tx', id?.toString()],
     enabled: id !== undefined && id > 0n,
-    staleTime: Infinity,
+    staleTime: (q) => (q.state.data ? Infinity : 30_000),
     retry: false,
     queryFn: async (): Promise<`0x${string}` | null> => {
       if (id === undefined) return null

@@ -1,7 +1,12 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
+
+/** Open sheets, topmost last, so Escape only closes the one on top. */
+const openSheets: string[] = []
+
+const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
 
 interface SheetProps {
   open: boolean
@@ -15,10 +20,39 @@ interface SheetProps {
 
 /** Bottom sheet on mobile, centered card on larger screens. */
 export function Sheet({ open, onClose, title, eyebrow, children, footer, locked }: SheetProps) {
+  const id = useId()
+  const panel = useRef<HTMLElement>(null)
+  const latest = useRef({ onClose, locked })
+
+  useEffect(() => {
+    latest.current = { onClose, locked }
+  })
+
   useEffect(() => {
     if (!open) return
+    openSheets.push(id)
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    panel.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !locked) onClose()
+      if (openSheets[openSheets.length - 1] !== id) return
+      if (e.key === 'Escape' && !latest.current.locked) {
+        e.stopPropagation()
+        latest.current.onClose()
+        return
+      }
+      if (e.key === 'Tab' && panel.current) {
+        const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null)
+        if (items.length === 0) return
+        const first = items[0]
+        const last = items[items.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
     }
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
@@ -26,8 +60,11 @@ export function Sheet({ open, onClose, title, eyebrow, children, footer, locked 
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
+      const i = openSheets.indexOf(id)
+      if (i >= 0) openSheets.splice(i, 1)
+      previouslyFocused?.focus?.()
     }
-  }, [open, onClose, locked])
+  }, [open, id])
 
   return createPortal(
     <AnimatePresence>
@@ -40,10 +77,12 @@ export function Sheet({ open, onClose, title, eyebrow, children, footer, locked 
         >
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={locked ? undefined : onClose} />
           <motion.section
+            ref={panel}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-coal-900 shadow-2xl sm:rounded-[28px]"
+            className="relative flex max-h-[92dvh] w-full max-w-md flex-col outline-none overflow-hidden rounded-t-[28px] bg-coal-900 shadow-2xl sm:rounded-[28px]"
             style={{ border: '1px solid rgba(246,234,215,0.1)' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}

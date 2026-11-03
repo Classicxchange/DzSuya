@@ -10,7 +10,8 @@ import { StatusTracker } from '@/components/StatusTracker'
 import { useOrder, useOrderTx } from '@/hooks/useShop'
 import { CHAIN_NAME, SHOP_ADDRESS, addressUrl, txUrl } from '@/lib/chain'
 import { formatClock, formatStamp, shortAddr, shortHash, usd } from '@/lib/format'
-import { PICKUP, decodeOrder, prepMinutes } from '@/lib/menu'
+import { revertName } from '@/lib/errors'
+import { PICKUP, prepMinutes, verifyOrder } from '@/lib/menu'
 import { buildShareLink } from '@/lib/share'
 
 interface ReceiptProps {
@@ -22,7 +23,7 @@ interface ReceiptProps {
 const INK = '#2A1A10'
 
 export function Receipt({ orderId, justPaid, onClose }: ReceiptProps) {
-  const { order, isLoading, isError } = useOrder(orderId)
+  const { order, isLoading, isError, error, refetch } = useOrder(orderId)
   const { data: hash } = useOrderTx(orderId)
   const [link, setLink] = useState<string | null>(null)
   const [qr, setQr] = useState<string | null>(null)
@@ -53,7 +54,16 @@ export function Receipt({ orderId, justPaid, onClose }: ReceiptProps) {
     }
   }, [link])
 
-  const lines = order ? decodeOrder(order.details) : []
+  const check = order ? verifyOrder(order.details, order.amount) : null
+  const lines = check?.lines ?? []
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
   const readyAt = order ? (Number(order.createdAt) + prepMinutes(lines) * 60) * 1000 : 0
   const minsLeft = Math.max(0, Math.ceil((readyAt - now) / 60000))
 
@@ -82,7 +92,7 @@ export function Receipt({ orderId, justPaid, onClose }: ReceiptProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-coal-950">
+    <div role="dialog" aria-modal="true" aria-label={`Receipt for order ${orderId.toString()}`} className="fixed inset-0 z-50 overflow-y-auto bg-coal-950">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-ember-600/25 to-transparent" />
       <div className="relative mx-auto max-w-md px-4 pb-24 pt-3">
         <div className="flex items-center justify-between py-2">
@@ -101,10 +111,22 @@ export function Receipt({ orderId, justPaid, onClose }: ReceiptProps) {
 
         {!isLoading && (isError || !order) && (
           <div className="surface mt-10 rounded-3xl p-6 text-center">
-            <h2 className="display text-xl font-bold text-cream-50">Receipt not found</h2>
-            <p className="mt-2 text-sm text-cream-300">
-              Order #{orderId.toString()} could not be read from {CHAIN_NAME}. Check the link and try again.
-            </p>
+            {revertName(error) === 'OrderNotFound' ? (
+              <>
+                <h2 className="display text-xl font-bold text-cream-50">Receipt not found</h2>
+                <p className="mt-2 text-sm text-cream-300">
+                  Order #{orderId.toString()} does not exist on {CHAIN_NAME}. Check the link and try again.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="display text-xl font-bold text-cream-50">Could not load this receipt</h2>
+                <p className="mt-2 text-sm text-cream-300">The network did not answer. Your payment is not affected.</p>
+                <button onClick={() => void refetch()} className="btn-ghost focus-ring mt-4 min-h-[48px] rounded-2xl px-5 text-sm">
+                  Try again
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -126,6 +148,14 @@ export function Receipt({ orderId, justPaid, onClose }: ReceiptProps) {
                 <BadgeCheck className="size-4" /> Paid with USDC on Arc
               </span>
             </motion.div>
+
+            {check && !check.ok && (
+              <div role="alert" className="mb-3 rounded-2xl border border-gold-400/40 bg-gold-400/10 p-3.5 text-sm text-gold-300">
+                {check.reason === 'unreadable'
+                  ? 'Some items on this order could not be read, so the shop may need to confirm it with you.'
+                  : `The amount paid (${usd(order.amount)} USDC) does not match the menu price of these items (${usd(check.expected)} USDC). The shop may ask you to settle the difference.`}
+              </div>
+            )}
 
             <article
               className="relative overflow-hidden rounded-[26px] shadow-2xl"
@@ -169,7 +199,7 @@ export function Receipt({ orderId, justPaid, onClose }: ReceiptProps) {
                           {l.sizeLabel} · {l.spiceLabel}
                           {l.extraLabels.length > 0 && ` · ${l.extraLabels.join(', ')}`}
                         </div>
-                        {l.note && <div className="text-xs italic opacity-80">"{l.note}"</div>}
+                        {l.note && <div className="break-words text-xs italic opacity-80">"{l.note}"</div>}
                       </div>
                       <div className="font-semibold tabular-nums">{usd(l.total)}</div>
                     </li>

@@ -21,6 +21,7 @@ import { ConnectKitProvider } from 'connectkit'
 import { Toaster } from 'sonner'
 import { config } from './config'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { installShareSync } from './lib/share'
 import './index.css'
 
@@ -33,7 +34,9 @@ createRoot(document.getElementById('root')!).render(
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider>
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
           <Toaster position="top-center" />
         </ConnectKitProvider>
       </QueryClientProvider>

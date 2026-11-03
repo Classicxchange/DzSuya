@@ -187,28 +187,77 @@ export interface DecodedLine extends CartLine {
   total: bigint
 }
 
+const SPICE_IDS = SPICE_LEVELS.map((s) => s.id as string)
+
+/** Validates one stored order tuple. Anything unexpected is rejected rather than guessed at. */
+function parseLine(raw: unknown): CartLine | null {
+  if (!Array.isArray(raw) || raw.length !== 6) return null
+  const [itemId, sizeId, spice, extras, qty, note] = raw as unknown[]
+  if (typeof itemId !== 'string' || typeof sizeId !== 'string' || typeof spice !== 'string') return null
+  const item = getItem(itemId)
+  if (!item || !item.sizes.some((s) => s.id === sizeId)) return null
+  if (!SPICE_IDS.includes(spice)) return null
+  if (!Array.isArray(extras) || extras.length > EXTRAS.length) return null
+  if (!extras.every((e) => typeof e === 'string' && !!getExtra(e)) || new Set(extras).size !== extras.length) return null
+  if (typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > 20) return null
+  if (typeof note !== 'string') return null
+  return { key: '', itemId, sizeId, spice: spice as Spice, extras: extras as string[], qty, note: note.slice(0, MAX_NOTE) }
+}
+
 export function decodeOrder(details: string): DecodedLine[] {
+  return verifyOrder(details, undefined).lines
+}
+
+export interface OrderCheck {
+  lines: DecodedLine[]
+  /** What the readable items add up to at menu prices. */
+  expected: bigint
+  /** True only when every line is valid and the amount paid equals the menu price. */
+  ok: boolean
+  reason?: 'unreadable' | 'underpaid' | 'overpaid'
+}
+
+/** Decodes the onchain order and compares what was paid with what the items cost. */
+export function verifyOrder(details: string, paid: bigint | undefined): OrderCheck {
+  let payload: unknown
   try {
-    const payload = JSON.parse(details) as Payload
-    if (payload.v !== 1 || !Array.isArray(payload.l)) return []
-    const out: DecodedLine[] = []
-    for (const [itemId, sizeId, spice, extras, qty, note] of payload.l) {
-      const item = getItem(itemId)
-      if (!item) continue
-      const line: CartLine = { key: '', itemId, sizeId, spice: spice as Spice, extras, qty, note }
-      out.push({
-        ...line,
-        itemName: item.name,
-        sizeLabel: getSize(item, sizeId).label,
-        spiceLabel: SPICE_LEVELS.find((s) => s.id === spice)?.label ?? 'Medium',
-        extraLabels: extras.map((e) => getExtra(e)?.label ?? e),
-        total: lineTotal(line),
-      })
-    }
-    return out
+    payload = JSON.parse(details)
   } catch {
-    return []
+    return { lines: [], expected: 0n, ok: false, reason: 'unreadable' }
   }
+  const list = (payload as { v?: unknown; l?: unknown } | null)?.l
+  if ((payload as { v?: unknown } | null)?.v !== 1 || !Array.isArray(list) || list.length === 0 || list.length > MAX_LINES) {
+    return { lines: [], expected: 0n, ok: false, reason: 'unreadable' }
+  }
+  const lines: DecodedLine[] = []
+  let allValid = true
+  for (const entry of list) {
+    const line = parseLine(entry)
+    if (!line) {
+      allValid = false
+      continue
+    }
+    const item = getItem(line.itemId)
+    if (!item) continue
+    lines.push({
+      ...line,
+      itemName: item.name,
+      sizeLabel: getSize(item, line.sizeId).label,
+      spiceLabel: SPICE_LEVELS.find((s) => s.id === line.spice)?.label ?? 'Medium',
+      extraLabels: line.extras.map((e) => getExtra(e)?.label ?? e),
+      total: lineTotal(line),
+    })
+  }
+  const expected = lines.reduce((sum, l) => sum + l.total, 0n)
+  if (!allValid) return { lines, expected, ok: false, reason: 'unreadable' }
+  if (paid === undefined || paid === expected) return { lines, expected, ok: true }
+  return { lines, expected, ok: false, reason: paid < expected ? 'underpaid' : 'overpaid' }
+}
+
+export function isValidCartLine(raw: unknown): raw is CartLine {
+  const l = raw as Partial<CartLine> | null
+  if (!l || typeof l !== 'object' || typeof l.key !== 'string') return false
+  return parseLine([l.itemId, l.sizeId, l.spice, l.extras, l.qty, l.note]) !== null
 }
 
 /** Honest estimate: a base queue time plus a little per portion. */

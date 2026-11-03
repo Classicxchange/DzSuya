@@ -4,6 +4,7 @@ import { AtSign, ReceiptText, ShoppingBag, Store, UtensilsCrossed } from 'lucide
 import { Fiat } from '@/components/Fiat'
 import { DzIdView } from '@/components/DzIdView'
 import { Header } from '@/components/Header'
+import { Landing } from '@/components/landing/Landing'
 import { ItemSheet } from '@/components/ItemSheet'
 import { MenuView } from '@/components/MenuView'
 import { OrdersView } from '@/components/OrdersView'
@@ -25,51 +26,68 @@ const TABS: { id: Tab; label: string; icon: typeof UtensilsCrossed }[] = [
   { id: 'seller', label: 'Seller', icon: Store },
 ]
 
-function readOrderParam(): bigint | null {
-  const raw = new URLSearchParams(window.location.search).get('order')
-  return raw && /^\d{1,12}$/.test(raw) && BigInt(raw) > 0n ? BigInt(raw) : null
+interface Route {
+  view: 'landing' | 'app'
+  tab: Tab
+  receiptId: bigint | null
+  pay: string | undefined
 }
 
-function readPayParam(): string | undefined {
-  const raw = new URLSearchParams(window.location.search).get('pay')
-  const name = raw ? normalizeName(raw) : ''
-  return name && isValidName(name) ? name : undefined
+/** `/` is the homepage; everything inside the app lives under a query such as `/?app=menu`. */
+function readRoute(): Route {
+  const params = new URLSearchParams(window.location.search)
+  const rawOrder = params.get('order')
+  const receiptId = rawOrder && /^\d{1,12}$/.test(rawOrder) && BigInt(rawOrder) > 0n ? BigInt(rawOrder) : null
+  const rawPay = params.get('pay')
+  const payName = rawPay ? normalizeName(rawPay) : ''
+  const pay = payName && isValidName(payName) ? payName : undefined
+  const appParam = params.get('app')
+  const tab = TABS.find((t) => t.id === appParam)?.id
+  if (pay) return { view: 'app', tab: 'dzid', receiptId, pay }
+  if (receiptId) return { view: 'app', tab: tab ?? 'menu', receiptId, pay }
+  if (tab || appParam !== null) return { view: 'app', tab: tab ?? 'menu', receiptId: null, pay }
+  return { view: 'landing', tab: 'menu', receiptId: null, pay }
 }
 
 function Shell() {
   const { count, total } = useCart()
-  const [payName] = useState(readPayParam)
-  const [tab, setTab] = useState<Tab>(() => (readPayParam() ? 'dzid' : 'menu'))
+  const [route, setRoute] = useState<Route>(readRoute)
   const [picked, setPicked] = useState<MenuItem | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
-  const [receipt, setReceipt] = useState<{ id: bigint; justPaid: boolean } | null>(() => {
-    const id = readOrderParam()
-    return id ? { id, justPaid: false } : null
-  })
+  const [justPaid, setJustPaid] = useState(false)
 
   useEffect(() => {
-    const onPop = () => {
-      const id = readOrderParam()
-      setReceipt(id ? { id, justPaid: false } : null)
-    }
+    const onPop = () => setRoute(readRoute())
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  const openReceipt = useCallback((id: bigint, justPaid = false) => {
-    window.history.pushState({}, '', `/?order=${id.toString()}`)
-    setReceipt({ id, justPaid })
+  const go = useCallback((query: string) => {
+    window.history.pushState({}, '', query ? `/?${query}` : '/')
+    setRoute(readRoute())
+    window.scrollTo({ top: 0 })
   }, [])
 
-  const closeReceipt = useCallback(() => {
-    window.history.pushState({}, '', '/')
-    setReceipt(null)
-    setTab('menu')
-  }, [])
+  const openApp = useCallback((tab: Tab) => go(`app=${tab}`), [go])
+
+  const openReceipt = useCallback(
+    (id: bigint, paid = false) => {
+      setJustPaid(paid)
+      go(`order=${id.toString()}`)
+    },
+    [go],
+  )
+
+  const closeReceipt = useCallback(() => go('app=menu'), [go])
+
+  const { tab, receiptId, pay: payName } = route
+  const receipt = receiptId ? { id: receiptId, justPaid } : null
+
+  if (route.view === 'landing') return <Landing onOpen={openApp} />
 
   return (
     <div className="min-h-dvh bg-coal-900">
-      <Header />
+      <Header onHome={() => go('')} />
       <nav className="mx-auto max-w-md px-4 pt-3" aria-label="Sections">
         <div className="grid grid-cols-4 gap-0.5 rounded-full bg-white/[0.05] p-1">
           {TABS.map(({ id, label, icon: Icon }) => {
@@ -77,7 +95,7 @@ function Shell() {
             return (
               <button
                 key={id}
-                onClick={() => setTab(id)}
+                onClick={() => openApp(id)}
                 aria-current={on ? 'page' : undefined}
                 className={`focus-ring relative flex min-h-[44px] items-center justify-center gap-1.5 rounded-full text-xs font-semibold transition-colors ${
                   on ? 'text-coal-950' : 'text-cream-200 hover:text-cream-50'
@@ -102,7 +120,7 @@ function Shell() {
 
       <main className="mx-auto max-w-md px-4 pb-44 pt-5">
         {tab === 'menu' && <MenuView onPick={setPicked} />}
-        {tab === 'orders' && <OrdersView onOpen={(id) => openReceipt(id)} onBrowse={() => setTab('menu')} />}
+        {tab === 'orders' && <OrdersView onOpen={(id) => openReceipt(id)} onBrowse={() => openApp('menu')} />}
         {tab === 'dzid' && <DzIdView initialName={payName} />}
         {tab === 'seller' && <SellerView onOpen={(id) => openReceipt(id)} />}
       </main>

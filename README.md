@@ -6,14 +6,15 @@ Built with [Arc Studio](https://studio.arc.io)
 
 ## Features
 
+- Homepage at `/` explaining the app: what it is, how ordering works, the menu, DZ ID, live order and name counts, contract links and an FAQ; the app itself opens from its buttons (`/?app=menu`, `/?app=orders`, `/?app=dzid`, `/?app=seller`)
 - Menu with sizes, spice levels, extras, quantity and special instructions
 - Wallet connection with automatic prompt to add or switch to Arc Testnet
 - USDC payment straight to the shop wallet
 - Full-screen receipt with transaction link, timestamp, QR code, copy and share
 - Order history that follows your wallet across devices
 - Live status: Order confirmed, Preparing, Ready for pickup
-- Seller dashboard, available only to the shop wallet
-- DZ ID: claim a short name for your wallet (one per wallet, permanent) and get paid in USDC by anyone who types it; payments go through the DZ ID contract and reach the wallet in the same transaction, and shareable pay links open the send form
+- Seller dashboard for the shop wallet, with a warning on any order whose payment does not match its items, and a safe two-step way to move the shop to a new wallet
+- DZ ID: claim a short name for your wallet (one per wallet, permanent, claimed in two quick steps so nobody can grab it first) and get paid in USDC by anyone who types it; payments go through the DZ ID contract and reach the wallet in the same transaction, and shareable pay links open the send form
 - Prices shown in your own currency (about 160 currencies) using live exchange rates from [Exchange Rate API](https://www.exchangerate-api.com); you always pay in USDC
 
 ## Tech stack
@@ -61,3 +62,9 @@ Menu photos come from Wikimedia Commons and are cropped and resized for display:
 - Street grill scene: "Sichimedia5.jpg" by Sichi Media, CC BY-SA 4.0
 
 The credits are also kept next to the images in `public/images/CREDITS.txt`.
+
+## Security
+
+- Never commit `.env`. It is listed in `.gitignore`; copy `.env.example` to `.env` and fill in the public contract addresses.
+- Order data and payments are public onchain. The Seller tab only controls what the app shows; the shop contract itself decides who can update orders.
+- Menu prices are applied by the app. If a payment does not match its items, the seller view and the receipt warn about it.

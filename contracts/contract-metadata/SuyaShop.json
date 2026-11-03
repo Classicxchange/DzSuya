@@ -1,13 +1,20 @@
 {
-  "contractAddress": "0xe431c67fcd03bb5ad5a894fd87318e12c39990f0",
+  "contractAddress": "0x4d51e63a14d681be06ac1c320bc4d120d45091f1",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/SuyaShop.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/SuyaShop.sol/SuyaShop.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0xe431c67fcd03bb5ad5a894fd87318e12c39990f0"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x4d51e63a14d681be06ac1c320bc4d120d45091f1"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0x4d51e63a14d681be06ac1c320bc4d120d45091f1",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x4d51e63a14d681be06ac1c320bc4d120d45091f1",
+      "txHash": "0x7989307a46f67ec6b318a33c79d7a186307db6d3fd47013cffea84f5c5621757",
+      "deployedAt": "2026-11-02T20:05:09.041Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0xe431c67fcd03bb5ad5a894fd87318e12c39990f0",
@@ -123,6 +130,13 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "acceptShop",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
     },
     {
       "type": "function",
@@ -341,6 +355,19 @@
     },
     {
       "type": "function",
+      "name": "pendingShop",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "placeOrder",
       "inputs": [
         {
@@ -361,6 +388,19 @@
           "internalType": "uint256"
         }
       ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "proposeShop",
+      "inputs": [
+        {
+          "name": "newShop",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
       "stateMutability": "nonpayable"
     },
     {
@@ -393,19 +433,6 @@
         }
       ],
       "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "transferShop",
-      "inputs": [
-        {
-          "name": "newShop",
-          "type": "address",
-          "internalType": "address"
-        }
-      ],
-      "outputs": [],
-      "stateMutability": "nonpayable"
     },
     {
       "type": "function",
@@ -453,6 +480,25 @@
     },
     {
       "type": "event",
+      "name": "ShopTransferProposed",
+      "inputs": [
+        {
+          "name": "shop",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "pendingShop",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "ShopTransferred",
       "inputs": [
         {
@@ -492,27 +538,78 @@
     {
       "type": "error",
       "name": "InvalidAmount",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "InvalidDetails",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "length",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "InvalidStatus",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "id",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "current",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "requested",
+          "type": "uint8",
+          "internalType": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "NotPendingShop",
+      "inputs": [
+        {
+          "name": "caller",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "NotShop",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "caller",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "OrderNotFound",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "id",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
     },
     {
       "type": "error",

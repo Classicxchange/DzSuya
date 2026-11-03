@@ -12,11 +12,32 @@ export const DZID_ABI = parseAbi([
   'function nameOf(address owner) view returns (string)',
   'function isAvailable(string name) view returns (bool)',
   'function totalNames() view returns (uint256)',
-  'function claim(string name)',
+  'function commitments(bytes32 commitment) view returns (uint64)',
+  'function makeCommitment(string name, address claimant, bytes32 salt) pure returns (bytes32)',
+  'function commit(bytes32 commitment)',
+  'function claim(string name, bytes32 salt)',
   'function sendToName(string name, uint256 amount, string memo) returns (address to)',
+  'event Committed(address indexed claimant, bytes32 commitment)',
   'event Claimed(address indexed owner, string name)',
   'event Sent(address indexed from, address indexed to, uint256 amount, string name, string memo)',
+  'error ZeroAddress()',
+  'error InvalidName(string name)',
+  'error NameTaken(string name)',
+  'error AlreadyHasName(address account)',
+  'error NameNotFound(string name)',
+  'error InvalidAmount(uint256 amount)',
+  'error MemoTooLong(uint256 length)',
+  'error SelfPayment(address account)',
+  'error NoCommitment(bytes32 commitment)',
+  'error CommitmentExists(bytes32 commitment)',
+  'error CommitmentTooNew(bytes32 commitment, uint64 committedAt, uint64 earliestReveal)',
+  'error CommitmentExpired(bytes32 commitment, uint64 committedAt, uint64 latestReveal)',
 ])
+
+/** Seconds a commitment must age before it can be revealed (mirrors the contract). */
+export const MIN_COMMIT_AGE = 6
+/** Seconds after which a commitment expires (mirrors the contract). */
+export const MAX_COMMIT_AGE = 86_400
 
 export const MEMO_MAX_BYTES = 80
 

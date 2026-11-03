@@ -44,14 +44,24 @@ bun run dev
 
 ## DzSuya (Professor Dozzie's Suya) deployment notes
 
-- Contract: `contracts/SuyaShop.sol`, deployed on Arc Testnet at 0xe431c67fcd03bb5ad5a894fd87318e12c39990f0 (block 70393651).
-- Constructor: (USDC 0x3600000000000000000000000000000000000000, shop wallet 0xf30173e31cb9b6a7234f4318b4a0183324bca743). The shop wallet receives all payments and is the only wallet that can update order status or transfer the shop.
+- Contract: `contracts/SuyaShop.sol`, deployed on Arc Testnet at 0x4d51e63a14d681be06ac1c320bc4d120d45091f1 (block 70402726).
+- Constructor: (USDC 0x3600000000000000000000000000000000000000, shop wallet 0xf30173e31cb9b6a7234f4318b4a0183324bca743). The shop wallet receives all payments and is the only wallet that can update order status. The shop moves to another wallet only through a two-step handover (`proposeShop`, then `acceptShop` from the new wallet).
 - Frontend reads `VITE_SUYA_SHOP_ADDRESS` and `VITE_SUYA_DEPLOY_BLOCK` from `.env`. Prices are computed in the frontend (`src/lib/menu.ts`) and not enforced onchain.
 - Payment flow: USDC approve (exact total) then `placeOrder(amount, details)`. Order details are compact JSON stored onchain; receipts are read from the contract.
 
 ## DZ ID
 
-- Contract: `contracts/DzID.sol` on Arc Testnet at 0x3be0a5780513002347360ae4e847ef1666a6e95e (block 70398286). Constructor arg: USDC 0x3600000000000000000000000000000000000000.
-- Names: 3 to 20 chars, a-z 0-9 underscore, permanent, one per wallet. `sendToName` pulls USDC into the contract and forwards it to the owner in the same transaction (needs a USDC allowance to the DzID contract).
+- Contract: `contracts/DzID.sol` on Arc Testnet at 0xf323d9703ad7229266493f7580f22a3a4a1a52bf (block 70402716). Constructor arg: USDC 0x3600000000000000000000000000000000000000.
+- Names: 3 to 20 chars, a-z 0-9 underscore (not at the start or end), permanent, one per wallet. Claiming is commit/reveal (`commit`, wait 6 seconds, `claim(name, salt)`) so names cannot be sniped; the salt is kept in localStorage until the claim completes. `sendToName` pulls USDC into the contract and forwards it to the owner in the same transaction (needs a USDC allowance to the DzID contract).
 - Env: `VITE_DZID_ADDRESS`, `VITE_DZID_DEPLOY_BLOCK`. Pay links use `/?pay=<name>`.
 - UI: `src/components/DzIdView.tsx`, `src/components/dz/*`, hooks `src/hooks/useDzId.ts`, `src/hooks/useDzActions.ts`.
+
+## Security notes
+
+- `.env` is gitignored and must never be committed; `.env.example` lists the public variables. Only public values may use the `VITE_` prefix.
+- Order prices are computed in the frontend, not enforced by the contract. The seller view and receipt flag any order whose amount differs from the menu price of its items.
+- Contracts were reviewed with a full-severity pass (rule corpus plus functional review) and Slither before the latest deploy. Previous deployments (SuyaShop 0xe431c6…90f0, DzID 0x3be0a5…6e95e) are superseded.
+
+## Routing
+
+- `/` is the landing page (`src/components/landing/`). The app lives under `/?app=<menu|orders|dzid|seller>`; `/?order=<id>` opens a receipt and `/?pay=<name>` opens the DZ ID send form. Routing is in `src/App.tsx` (`readRoute`).

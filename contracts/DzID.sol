@@ -20,18 +20,46 @@ contract DzID is ReentrancyGuard {
     /// @notice Wallet's permanent name, or an empty string if none.
     mapping(address owner => string name) public nameOf;
 
+    /// @notice Minimum time before a commitment may be revealed.
+    uint256 public constant MIN_COMMIT_AGE = 6 seconds;
+    /// @notice Maximum time a commitment remains valid, inclusive.
+    uint256 public constant MAX_COMMIT_AGE = 1 days;
+
+    /// @notice Commitment timestamp, or zero if no commitment is stored.
+    mapping(bytes32 commitment => uint64 committedAt) public commitments;
+
     /// @notice Total number of claimed names.
     uint256 public totalNames;
 
     error ZeroAddress();
-    error InvalidName();
-    error NameTaken();
-    error AlreadyHasName();
-    error NameNotFound();
-    error InvalidAmount();
-    error MemoTooLong();
-    error SelfPayment();
+    /// @param name Name that fails validation.
+    error InvalidName(string name);
+    /// @param name Name that is already claimed.
+    error NameTaken(string name);
+    /// @param account Wallet that already owns a permanent name.
+    error AlreadyHasName(address account);
+    /// @param commitment Commitment that already exists and has not expired.
+    error CommitmentExists(bytes32 commitment);
+    /// @param commitment Commitment that is not stored.
+    error NoCommitment(bytes32 commitment);
+    /// @param commitment Commitment that cannot yet be revealed.
+    /// @param committedAt Timestamp when the commitment was stored.
+    /// @param earliestReveal Earliest timestamp at which reveal is permitted, inclusive.
+    error CommitmentTooNew(bytes32 commitment, uint64 committedAt, uint64 earliestReveal);
+    /// @param commitment Commitment whose reveal window has expired.
+    /// @param committedAt Timestamp when the commitment was stored.
+    /// @param latestReveal Latest timestamp at which reveal is permitted, inclusive.
+    error CommitmentExpired(bytes32 commitment, uint64 committedAt, uint64 latestReveal);
+    /// @param name Name that has not been claimed.
+    error NameNotFound(string name);
+    /// @param amount Invalid payment amount in six-decimal USDC base units.
+    error InvalidAmount(uint256 amount);
+    /// @param length Payment memo length in bytes that exceeds the limit.
+    error MemoTooLong(uint256 length);
+    /// @param account Wallet attempting to pay itself.
+    error SelfPayment(address account);
 
+    event Committed(address indexed claimant, bytes32 commitment);
     event Claimed(address indexed owner, string name);
     event Sent(address indexed from, address indexed to, uint256 amount, string name, string memo);
 
@@ -41,12 +69,39 @@ contract DzID is ReentrancyGuard {
         usdc = IERC20(usdc_);
     }
 
-    /// @notice Claim an available name permanently for the calling wallet.
+    /// @notice Compute a commitment binding a name and salt to a claimant.
+    /// @param name Name to claim upon reveal.
+    /// @param claimant Wallet that will reveal and own the name.
+    /// @param salt Secret random value to conceal the name until reveal.
+    function makeCommitment(string calldata name, address claimant, bytes32 salt) public pure returns (bytes32) {
+        return keccak256(abi.encode(name, claimant, salt));
+    }
+
+    /// @notice Store a commitment; an existing commitment may be replaced only after expiry.
+    /// @param commitment Hash returned by makeCommitment for the intended claimant.
+    function commit(bytes32 commitment) external {
+        uint64 committedAt = commitments[commitment];
+        if (committedAt != 0 && block.timestamp <= uint256(committedAt) + MAX_COMMIT_AGE) {
+            revert CommitmentExists(commitment);
+        }
+        commitments[commitment] = uint64(block.timestamp);
+        emit Committed(msg.sender, commitment);
+    }
+
+    /// @notice Reveal a commitment aged 6 seconds to 1 day and claim a name permanently.
     /// @param name Valid lowercase name; each wallet may claim only one.
-    function claim(string calldata name) external {
-        if (!isValidName(name)) revert InvalidName();
-        if (ownerOf[name] != address(0)) revert NameTaken();
-        if (bytes(nameOf[msg.sender]).length != 0) revert AlreadyHasName();
+    /// @param salt Secret value used when making the commitment for the calling wallet.
+    function claim(string calldata name, bytes32 salt) external {
+        bytes32 commitment = makeCommitment(name, msg.sender, salt);
+        uint64 committedAt = commitments[commitment];
+        if (committedAt == 0) revert NoCommitment(commitment);
+        if (block.timestamp < uint256(committedAt) + MIN_COMMIT_AGE) revert CommitmentTooNew(commitment, committedAt, uint64(uint256(committedAt) + MIN_COMMIT_AGE));
+        if (block.timestamp > uint256(committedAt) + MAX_COMMIT_AGE) revert CommitmentExpired(commitment, committedAt, uint64(uint256(committedAt) + MAX_COMMIT_AGE));
+        delete commitments[commitment];
+
+        if (!isValidName(name)) revert InvalidName(name);
+        if (ownerOf[name] != address(0)) revert NameTaken(name);
+        if (bytes(nameOf[msg.sender]).length != 0) revert AlreadyHasName(msg.sender);
 
         ownerOf[name] = msg.sender;
         nameOf[msg.sender] = name;
@@ -66,10 +121,10 @@ contract DzID is ReentrancyGuard {
         returns (address to)
     {
         to = ownerOf[name];
-        if (to == address(0)) revert NameNotFound();
-        if (amount == 0) revert InvalidAmount();
-        if (bytes(memo).length > 80) revert MemoTooLong();
-        if (to == msg.sender) revert SelfPayment();
+        if (to == address(0)) revert NameNotFound(name);
+        if (amount == 0) revert InvalidAmount(amount);
+        if (bytes(memo).length > 80) revert MemoTooLong(bytes(memo).length);
+        if (to == msg.sender) revert SelfPayment(msg.sender);
 
         usdc.safeTransferFrom(msg.sender, address(this), amount);
         usdc.safeTransfer(to, amount);

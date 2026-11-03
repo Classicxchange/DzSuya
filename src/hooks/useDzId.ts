@@ -47,6 +47,7 @@ export function useNameOwner(name: string) {
 }
 
 export interface DzTransfer {
+  id: string
   hash: `0x${string}`
   from: Address
   to: Address
@@ -91,7 +92,7 @@ function toRaw(log: SentLog, direction: 'in' | 'out'): Raw {
 }
 
 const STEP = 10_000n
-const MAX_LOOKBACK = 300_000n
+const MAX_LOOKBACK = 100_000n
 const MAX_ITEMS = 20
 
 /** Recent DZ ID payments sent or received by a wallet, scanned forward from the deployment block. */
@@ -100,7 +101,7 @@ export function useDzActivity(address: Address | undefined) {
   return useQuery({
     queryKey: ['dz-activity', address],
     enabled: !!client && !!DZID_ADDRESS && !!address,
-    refetchInterval: 10_000,
+    refetchInterval: 20_000,
     retry: 1,
     queryFn: async (): Promise<DzTransfer[]> => {
       if (!client || !DZID_ADDRESS || !address) return []
@@ -136,6 +137,7 @@ export function useDzActivity(address: Address | undefined) {
       )
 
       return newest.map((n) => ({
+        id: `${n.hash}:${n.logIndex}`,
         hash: n.hash,
         from: n.from,
         to: n.to,

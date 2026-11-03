@@ -7,7 +7,7 @@ import { Fiat } from '@/components/Fiat'
 import { useDebounced, useNameOwner } from '@/hooks/useDzId'
 import { useSendToName, type DzSendResult } from '@/hooks/useDzActions'
 import { useUsdcBalance } from '@/hooks/useShop'
-import { CHAIN_ID, txUrl } from '@/lib/chain'
+import { CHAIN_ID, GAS_RESERVE, txUrl } from '@/lib/chain'
 import { DZID_ADDRESS, MEMO_MAX_BYTES, displayName, nameProblem, normalizeName } from '@/lib/dzid'
 import { shortAddr, usd } from '@/lib/format'
 import { parseAmount } from '@/onchain-money'
@@ -45,7 +45,7 @@ export function SendCard({ initialName }: { initialName?: string }) {
 
   const amount = parseInput(amountText)
   const memoBytes = new TextEncoder().encode(memo).length
-  const short = amount !== null && balance !== undefined && balance < amount
+  const short = amount !== null && balance !== undefined && balance < amount + GAS_RESERVE
   const ready = !!owner && !isSelf && amount !== null && !short && memoBytes <= MEMO_MAX_BYTES
 
   if (!DZID_ADDRESS) return null
@@ -100,7 +100,9 @@ export function SendCard({ initialName }: { initialName?: string }) {
 
   const label = !isConnected
     ? 'Connect wallet to send'
-    : phase === 'switching'
+    : phase === 'checking'
+      ? 'Checking…'
+      : phase === 'switching'
       ? 'Switching network…'
       : phase === 'approving'
         ? 'Allow USDC in your wallet…'
@@ -146,9 +148,10 @@ export function SendCard({ initialName }: { initialName?: string }) {
         {problem && name.length > 0 && <span className="text-chili-500">{problem}</span>}
         {notFound && <span className="text-chili-500">No one has claimed {displayName(name)} yet.</span>}
         {isSelf && <span className="text-chili-500">That is your own DZ ID. Pick someone else.</span>}
+        {lookup.isError && !resolving && <span className="text-chili-500">Could not check that name. Try again.</span>}
         {owner && !isSelf && (
           <span className="text-leaf-400">
-            {displayName(name)} is <span className="font-mono">{shortAddr(owner)}</span>
+            {displayName(name)} is <span className="break-all font-mono">{owner}</span>
           </span>
         )}
       </p>
@@ -194,8 +197,8 @@ export function SendCard({ initialName }: { initialName?: string }) {
       </div>
       {short && (
         <p className="mt-2 text-xs text-gold-300">
-          You only have {balance !== undefined ? usd(balance) : '0.00'} USDC. Use the Get test USDC button in the Arc Studio
-          sidebar to top up.
+          You have {balance !== undefined ? usd(balance) : '0.00'} USDC. Keep about 0.05 USDC extra for network fees, or use
+          the Get test USDC button in the Arc Studio sidebar to top up.
         </p>
       )}
 
@@ -210,7 +213,7 @@ export function SendCard({ initialName }: { initialName?: string }) {
         disabled={busy}
         className="focus-ring mt-1.5 min-h-[48px] w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-cream-50 placeholder:text-cream-300/40"
       />
-      {memoBytes > MEMO_MAX_BYTES && <p className="mt-1 text-xs text-chili-500">Keep the note under {MEMO_MAX_BYTES} characters.</p>}
+      {memoBytes > MEMO_MAX_BYTES && <p className="mt-1 text-xs text-chili-500">Keep the note under {MEMO_MAX_BYTES} bytes.</p>}
 
       {error && (
         <div role="alert" className="mt-3 rounded-xl bg-chili-500/15 p-3 text-sm text-cream-50">

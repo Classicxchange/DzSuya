@@ -1,7 +1,12 @@
-import { Amount, usdcDecimalsFor } from '@/onchain-money'
+import { formatUnitsExact, usdcDecimalsFor } from '@/onchain-money'
 import { CHAIN_ID } from '@/lib/chain'
 
-export const usd = (raw: bigint): string => Amount.fromRaw(raw, usdcDecimalsFor(CHAIN_ID)).toFixed(2)
+/** Exact USDC amount with at least two decimals, e.g. 2.50 or 0.001. */
+export function usd(raw: bigint): string {
+  const exact = formatUnitsExact(raw, usdcDecimalsFor(CHAIN_ID))
+  const [whole, fraction = ''] = exact.split('.')
+  return `${whole}.${fraction.padEnd(2, '0')}`
+}
 
 export const shortAddr = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`
 
@@ -27,4 +32,11 @@ export function timeAgo(unixSeconds: bigint | number, now = Date.now()): string 
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`
   return `${Math.floor(diff / 86400)} d ago`
+}
+
+/** Compact amount for sentences, e.g. "1,000" or "2.5". */
+export const formatUsdcShort = (raw: bigint): string => {
+  const [whole, fraction] = usd(raw).split('.')
+  const trimmed = fraction.replace(/0+$/, '')
+  return `${Number(whole).toLocaleString()}${trimmed ? `.${trimmed}` : ''}`
 }

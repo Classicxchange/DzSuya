@@ -30,7 +30,7 @@ export function ActivityList() {
           {data.map((t) => {
             const incoming = t.direction === 'in'
             return (
-              <li key={`${t.hash}-${t.from}-${t.amount}`} className="surface flex items-center gap-3 rounded-2xl p-3.5">
+              <li key={t.id} className="surface flex items-center gap-3 rounded-2xl p-3.5">
                 <span
                   className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
                     incoming ? 'bg-leaf-500/15 text-leaf-400' : 'bg-ember-500/15 text-ember-400'

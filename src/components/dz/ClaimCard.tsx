@@ -13,7 +13,7 @@ import { buildShareLink } from '@/lib/share'
 export function ClaimCard() {
   const { address, isConnected } = useAccount()
   const { setOpen } = useModal()
-  const { name: myName, isLoading } = useMyDzName(address)
+  const { name: myName, isLoading, isError: nameError, refetch: refetchName } = useMyDzName(address)
   const [draft, setDraft] = useState('')
   const name = normalizeName(draft)
   const debounced = useDebounced(name)
@@ -61,6 +61,17 @@ export function ClaimCard() {
       <div className="flex justify-center py-10 text-ember-400">
         <Loader2 className="size-6 animate-spin" />
       </div>
+    )
+  }
+
+  if (nameError && !myName) {
+    return (
+      <section className="surface rounded-3xl p-5 text-center">
+        <p className="text-sm text-cream-200">Could not check your DZ ID right now.</p>
+        <button onClick={() => void refetchName()} className="btn-ghost focus-ring mt-3 min-h-[48px] rounded-2xl px-5 text-sm">
+          Try again
+        </button>
+      </section>
     )
   }
 
@@ -129,7 +140,7 @@ export function ClaimCard() {
       <div className="eyebrow text-ember-400">DZ ID</div>
       <h2 className="display mt-1 text-2xl font-bold text-cream-50">Claim your name</h2>
       <p className="mt-1 text-sm text-cream-300 text-pretty">
-        One name per wallet, yours alone and permanent. Anyone can send you USDC by typing it.
+        One name per wallet, yours alone and permanent. Claiming takes two quick wallet confirmations so nobody can grab your name first.
       </p>
 
       <label htmlFor="dz-claim" className="sr-only">
@@ -174,15 +185,23 @@ export function ClaimCard() {
         className="btn-primary focus-ring mt-3 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl text-base"
       >
         {busy && <Loader2 className="size-5 animate-spin" />}
-        {phase === 'switching'
-          ? 'Switching network…'
-          : phase === 'wallet'
-            ? 'Confirm in your wallet…'
-            : phase === 'confirming'
-              ? 'Claiming…'
-              : available
-                ? `Claim ${displayName(name)}`
-                : 'Pick an available name'}
+        {phase === 'checking'
+          ? 'Checking…'
+          : phase === 'switching'
+            ? 'Switching network…'
+            : phase === 'committing'
+              ? 'Step 1 of 2: confirm in your wallet…'
+              : phase === 'commit-confirm'
+                ? 'Reserving your name…'
+                : phase === 'waiting'
+                  ? 'Securing your name…'
+                  : phase === 'wallet'
+                    ? 'Step 2 of 2: confirm in your wallet…'
+                    : phase === 'confirming'
+                      ? 'Claiming…'
+                      : available
+                        ? `Claim ${displayName(name)}`
+                        : 'Pick an available name'}
       </button>
     </section>
   )

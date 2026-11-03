@@ -45,18 +45,26 @@ function defaultCode(): string {
 function readCache(): RatesPayload | undefined {
   try {
     const parsed = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as RatesPayload | null
-    return parsed && parsed.rates ? parsed : undefined
+    return parsed && parsed.rates ? { ...parsed, rates: cleanRates(parsed.rates) } : undefined
   } catch {
     return undefined
   }
 }
 
+function cleanRates(input: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [code, value] of Object.entries(input)) {
+    if (/^[A-Z]{3}$/.test(code) && typeof value === 'number' && Number.isFinite(value) && value > 0) out[code] = value
+  }
+  return out
+}
+
 async function fetchRates(): Promise<RatesPayload> {
-  const res = await fetch(RATES_URL)
+  const res = await fetch(RATES_URL, { signal: AbortSignal.timeout(8000) })
   if (!res.ok) throw new Error(`rates ${res.status}`)
   const json = (await res.json()) as { result?: string; rates?: Record<string, number>; time_last_update_unix?: number }
   if (json.result !== 'success' || !json.rates) throw new Error('rates unavailable')
-  const payload: RatesPayload = { rates: json.rates, updatedAt: json.time_last_update_unix ?? Math.floor(Date.now() / 1000) }
+  const payload: RatesPayload = { rates: cleanRates(json.rates), updatedAt: json.time_last_update_unix ?? Math.floor(Date.now() / 1000) }
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload))
   } catch {

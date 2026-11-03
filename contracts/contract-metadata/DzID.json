@@ -1,13 +1,20 @@
 {
-  "contractAddress": "0x3be0a5780513002347360ae4e847ef1666a6e95e",
+  "contractAddress": "0xf323d9703ad7229266493f7580f22a3a4a1a52bf",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/DzID.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/DzID.sol/DzID.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x3be0a5780513002347360ae4e847ef1666a6e95e"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0xf323d9703ad7229266493f7580f22a3a4a1a52bf"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0xf323d9703ad7229266493f7580f22a3a4a1a52bf",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0xf323d9703ad7229266493f7580f22a3a4a1a52bf",
+      "txHash": "0x387b29fb4a8789db4658a0e6331305e0abc2daa27d8a20593e59a8540d97bd99",
+      "deployedAt": "2026-11-02T20:05:02.887Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0x3be0a5780513002347360ae4e847ef1666a6e95e",
@@ -30,16 +37,79 @@
     },
     {
       "type": "function",
+      "name": "MAX_COMMIT_AGE",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "MIN_COMMIT_AGE",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "claim",
       "inputs": [
         {
           "name": "name",
           "type": "string",
           "internalType": "string"
+        },
+        {
+          "name": "salt",
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [],
       "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "commit",
+      "inputs": [
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "commitments",
+      "inputs": [
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "committedAt",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ],
+      "stateMutability": "view"
     },
     {
       "type": "function",
@@ -75,6 +145,35 @@
           "name": "",
           "type": "bool",
           "internalType": "bool"
+        }
+      ],
+      "stateMutability": "pure"
+    },
+    {
+      "type": "function",
+      "name": "makeCommitment",
+      "inputs": [
+        {
+          "name": "name",
+          "type": "string",
+          "internalType": "string"
+        },
+        {
+          "name": "claimant",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "salt",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "stateMutability": "pure"
@@ -193,6 +292,25 @@
     },
     {
       "type": "event",
+      "name": "Committed",
+      "inputs": [
+        {
+          "name": "claimant",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "indexed": false,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "Sent",
       "inputs": [
         {
@@ -231,32 +349,132 @@
     {
       "type": "error",
       "name": "AlreadyHasName",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "account",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CommitmentExists",
+      "inputs": [
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CommitmentExpired",
+      "inputs": [
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "committedAt",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "latestReveal",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CommitmentTooNew",
+      "inputs": [
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "committedAt",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "earliestReveal",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "InvalidAmount",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "InvalidName",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "name",
+          "type": "string",
+          "internalType": "string"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "MemoTooLong",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "length",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "NameNotFound",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "name",
+          "type": "string",
+          "internalType": "string"
+        }
+      ]
     },
     {
       "type": "error",
       "name": "NameTaken",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "name",
+          "type": "string",
+          "internalType": "string"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "NoCommitment",
+      "inputs": [
+        {
+          "name": "commitment",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ]
     },
     {
       "type": "error",
@@ -277,7 +495,13 @@
     {
       "type": "error",
       "name": "SelfPayment",
-      "inputs": []
+      "inputs": [
+        {
+          "name": "account",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
     },
     {
       "type": "error",

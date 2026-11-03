@@ -1,6 +1,7 @@
 import { isAddress, parseAbi, type Address } from 'viem'
 import { arcTestnet } from 'viem/chains'
 import { buildAddressExplorerUrl, buildTxExplorerUrl, getUsdc, requireChain } from '@/onchain-facts'
+import { parseUsdc } from '@/onchain-money'
 
 export const CHAIN_ID = arcTestnet.id
 export const CHAIN_NAME = requireChain(CHAIN_ID).name
@@ -16,8 +17,16 @@ export const SHOP_ADDRESS: Address | undefined = rawShop && isAddress(rawShop) ?
 const rawBlock = import.meta.env.VITE_SUYA_DEPLOY_BLOCK as string | undefined
 export const DEPLOY_BLOCK: bigint | undefined = rawBlock && /^\d+$/.test(rawBlock) ? BigInt(rawBlock) : undefined
 
+/** Largest single order the shop contract accepts. */
+export const MAX_ORDER_RAW = parseUsdc('1000')
+/** USDC kept aside for network fees, which are paid in USDC on Arc. */
+export const GAS_RESERVE = parseUsdc('0.05')
+
 export const SHOP_ABI = parseAbi([
   'function shop() view returns (address)',
+  'function pendingShop() view returns (address)',
+  'function proposeShop(address newShop)',
+  'function acceptShop()',
   'function orderCount() view returns (uint256)',
   'function getOrder(uint256 id) view returns ((uint256 id, address customer, uint256 amount, uint8 status, uint64 createdAt, uint64 updatedAt, string details))',
   'function getOrders(uint256 offset, uint256 limit) view returns ((uint256 id, address customer, uint256 amount, uint8 status, uint64 createdAt, uint64 updatedAt, string details)[])',
@@ -26,6 +35,15 @@ export const SHOP_ABI = parseAbi([
   'function setStatus(uint256 id, uint8 newStatus)',
   'event OrderPlaced(uint256 indexed id, address indexed customer, uint256 amount, string details)',
   'event StatusUpdated(uint256 indexed id, uint8 status)',
+  'event ShopTransferProposed(address indexed shop, address indexed pendingShop)',
+  'event ShopTransferred(address indexed previousShop, address indexed newShop)',
+  'error ZeroAddress()',
+  'error NotShop(address caller)',
+  'error NotPendingShop(address caller)',
+  'error InvalidAmount(uint256 amount)',
+  'error InvalidDetails(uint256 length)',
+  'error OrderNotFound(uint256 id)',
+  'error InvalidStatus(uint256 id, uint8 current, uint8 requested)',
 ])
 
 export interface OrderView {
@@ -43,7 +61,7 @@ export const STATUS_LABELS = ['Order confirmed', 'Preparing', 'Ready for pickup'
 export const txUrl = (hash: string) => buildTxExplorerUrl(CHAIN_ID, hash)
 export const addressUrl = (address: string) => buildAddressExplorerUrl(CHAIN_ID, address)
 
-const TX_KEY = (id: bigint | number) => `suya:tx:${id}`
+const TX_KEY = (id: bigint | number) => `suya:tx:${SHOP_ADDRESS ?? 'none'}:${id}`
 
 export function saveOrderTx(id: bigint, hash: string): void {
   try {

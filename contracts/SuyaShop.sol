@@ -22,6 +22,7 @@ contract SuyaShop is ReentrancyGuard {
 
     IERC20 public immutable usdc;
     address public shop;
+    address public pendingShop;
 
     struct Order {
         address customer;
@@ -47,18 +48,28 @@ contract SuyaShop is ReentrancyGuard {
     mapping(address customer => uint256[]) private _customerOrderIds;
 
     error ZeroAddress();
-    error NotShop();
-    error InvalidAmount();
-    error InvalidDetails();
-    error OrderNotFound();
-    error InvalidStatus();
+    /// @param caller Wallet that is not the current shop.
+    error NotShop(address caller);
+    /// @param caller Wallet that is not the pending shop.
+    error NotPendingShop(address caller);
+    /// @param amount Invalid payment amount in six-decimal USDC base units.
+    error InvalidAmount(uint256 amount);
+    /// @param length Invalid order details length in bytes.
+    error InvalidDetails(uint256 length);
+    /// @param id Order identifier that does not exist.
+    error OrderNotFound(uint256 id);
+    /// @param id Order identifier whose status cannot be changed as requested.
+    /// @param current Current order status.
+    /// @param requested Requested order status.
+    error InvalidStatus(uint256 id, uint8 current, uint8 requested);
 
+    event ShopTransferProposed(address indexed shop, address indexed pendingShop);
     event ShopTransferred(address indexed previousShop, address indexed newShop);
     event OrderPlaced(uint256 indexed id, address indexed customer, uint256 amount, string details);
     event StatusUpdated(uint256 indexed id, uint8 status);
 
     modifier onlyShop() {
-        if (msg.sender != shop) revert NotShop();
+        if (msg.sender != shop) revert NotShop(msg.sender);
         _;
     }
 
@@ -70,12 +81,20 @@ contract SuyaShop is ReentrancyGuard {
         emit ShopTransferred(address(0), shop_);
     }
 
-    /// @notice Transfer shop control and future payment receipts to a nonzero wallet.
-    function transferShop(address newShop) external onlyShop {
-        if (newShop == address(0)) revert ZeroAddress();
+    /// @notice Propose a wallet to receive shop control and future payments.
+    /// @param newShop Proposed shop wallet; zero cancels the pending proposal.
+    function proposeShop(address newShop) external onlyShop {
+        pendingShop = newShop;
+        emit ShopTransferProposed(shop, newShop);
+    }
+
+    /// @notice Accept shop control and future payments as the pending shop wallet.
+    function acceptShop() external {
+        if (msg.sender != pendingShop) revert NotPendingShop(msg.sender);
         address previousShop = shop;
-        shop = newShop;
-        emit ShopTransferred(previousShop, newShop);
+        shop = msg.sender;
+        pendingShop = address(0);
+        emit ShopTransferred(previousShop, msg.sender);
     }
 
     /// @notice Place an order and pay the shop directly using a prior USDC approval.
@@ -85,9 +104,9 @@ contract SuyaShop is ReentrancyGuard {
     /// @dev All order effects precede the token call; a failed payment rolls them back.
     function placeOrder(uint256 amount, string calldata details) external nonReentrant returns (uint256 id) {
         address recipient = shop;
-        if (amount == 0 || amount > MAX_ORDER) revert InvalidAmount();
+        if (amount == 0 || amount > MAX_ORDER) revert InvalidAmount(amount);
         uint256 length = bytes(details).length;
-        if (length == 0 || length > MAX_DETAILS_BYTES) revert InvalidDetails();
+        if (length == 0 || length > MAX_DETAILS_BYTES) revert InvalidDetails(length);
 
         id = ++_orderCount;
         uint64 timestamp = uint64(block.timestamp);
@@ -111,7 +130,7 @@ contract SuyaShop is ReentrancyGuard {
     function setStatus(uint256 id, uint8 newStatus) external onlyShop {
         _requireOrder(id);
         Order storage order = _orders[id];
-        if (newStatus <= order.status || newStatus > COLLECTED) revert InvalidStatus();
+        if (newStatus <= order.status || newStatus > COLLECTED) revert InvalidStatus(id, order.status, newStatus);
         order.status = newStatus;
         order.updatedAt = uint64(block.timestamp);
         emit StatusUpdated(id, newStatus);
@@ -165,7 +184,7 @@ contract SuyaShop is ReentrancyGuard {
     }
 
     function _requireOrder(uint256 id) private view {
-        if (id == 0 || id > _orderCount) revert OrderNotFound();
+        if (id == 0 || id > _orderCount) revert OrderNotFound(id);
     }
 
     function _orderView(uint256 id) private view returns (OrderView memory) {

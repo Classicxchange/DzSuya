@@ -9,7 +9,7 @@ import { CHAIN_ID } from '@/lib/chain'
 import { shortAddr } from '@/lib/format'
 import { Amount, usdcDecimalsFor } from '@/onchain-money'
 
-export function Header() {
+export function Header({ onHome }: { onHome: () => void }) {
   const { address, chainId, isConnected } = useAccount()
   const { switchChain, isPending } = useSwitchChain()
   const { data: balance } = useUsdcBalance(address)
@@ -19,13 +19,15 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/5 bg-coal-900/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-md items-center gap-3 px-4 py-3">
-        <Logo size={42} />
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="display truncate text-xl font-bold text-cream-50">
-            Dz<span className="text-ember-400">Suya</span>
-          </div>
-          <div className="eyebrow text-gold-400">Professor Dozzie's · Woji Rd</div>
-        </div>
+        <button onClick={onHome} aria-label="DzSuya homepage" className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-full text-left">
+          <Logo size={42} />
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="display block truncate text-xl font-bold text-cream-50">
+              Dz<span className="text-ember-400">Suya</span>
+            </span>
+            <span className="eyebrow block text-gold-400">Professor Dozzie's · Woji Rd</span>
+          </span>
+        </button>
         <ConnectKitButton.Custom>
           {({ isConnected: connected, show, address: addr }) => {
             if (wrongChain) {

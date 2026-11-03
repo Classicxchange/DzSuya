@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useModal } from 'connectkit'
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, Loader2, Lock, Store } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, Lock, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi'
 import { CurrencyPicker } from '@/components/CurrencyPicker'
 import { Fiat } from '@/components/Fiat'
-import { useAllOrders, useShopWallet } from '@/hooks/useShop'
+import { AcceptShop, ShopSettings } from '@/components/ShopAdmin'
+import { useAllOrders, usePendingShop, useShopWallet } from '@/hooks/useShop'
 import { CHAIN_ID, SHOP_ABI, SHOP_ADDRESS, STATUS_LABELS, type OrderView } from '@/lib/chain'
 import { parseTxError } from '@/lib/errors'
 import { shortAddr, timeAgo, usd } from '@/lib/format'
-import { decodeOrder } from '@/lib/menu'
+import { verifyOrder } from '@/lib/menu'
 
 const NEXT: Record<number, { label: string; status: number } | undefined> = {
   0: { label: 'Start preparing', status: 1 },
@@ -21,9 +22,10 @@ const NEXT: Record<number, { label: string; status: number } | undefined> = {
 export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
   const { address, isConnected, chainId } = useAccount()
   const { setOpen } = useModal()
-  const { data: shopWallet, isLoading: loadingShop } = useShopWallet()
+  const { data: shopWallet, isLoading: loadingShop, isError: shopError, refetch: refetchShop } = useShopWallet()
+  const { data: pendingShop } = usePendingShop()
   const isShop = !!address && !!shopWallet && address.toLowerCase() === shopWallet.toLowerCase()
-  const { orders, isLoading } = useAllOrders(isShop)
+  const { orders, isLoading, isError: ordersError, refetch: refetchOrders } = useAllOrders(isShop)
   const [filter, setFilter] = useState<'active' | 'done'>('active')
   const [pending, setPending] = useState<bigint | null>(null)
   const client = usePublicClient({ chainId: CHAIN_ID })
@@ -50,6 +52,27 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
       <div className="flex justify-center py-24 text-ember-400">
         <Loader2 className="size-7 animate-spin" />
       </div>
+    )
+  }
+  if (shopError && !shopWallet) {
+    return (
+      <Gate
+        icon={<Store className="size-7" />}
+        title="Could not check the shop wallet"
+        body="The network did not answer. Try again in a moment."
+        action="Try again"
+        onAction={() => void refetchShop()}
+      />
+    )
+  }
+  if (!isShop && !!address && !!pendingShop && address.toLowerCase() === pendingShop.toLowerCase()) {
+    return (
+      <Gate
+        icon={<Store className="size-7" />}
+        title="You were invited to run this shop"
+        body="The current shop wallet proposed this wallet as the new owner. Accept to receive payments and manage orders."
+        extra={<AcceptShop />}
+      />
     )
   }
   if (!isShop) {
@@ -104,7 +127,7 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Waiting" value={String(active.length)} />
         <Stat label="Done" value={String(done.length)} />
-        <Stat label="Sales" value={usd(revenue)} suffix="USDC" />
+        <Stat label="Sales" value={usd(revenue)} suffix="USDC, last 50" />
       </div>
       <div className="flex items-center justify-between gap-2 text-xs text-cream-300">
         <span>
@@ -113,12 +136,11 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
         <CurrencyPicker />
       </div>
 
-      <div className="flex gap-2" role="tablist">
+      <div className="flex gap-2">
         {(['active', 'done'] as const).map((f) => (
           <button
             key={f}
-            role="tab"
-            aria-selected={filter === f}
+            aria-pressed={filter === f}
             onClick={() => setFilter(f)}
             className={`focus-ring min-h-[44px] flex-1 rounded-full text-sm font-semibold transition-colors ${
               filter === f ? 'bg-ember-500 text-coal-950' : 'btn-ghost'
@@ -133,6 +155,13 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
         <div className="flex justify-center py-16 text-ember-400">
           <Loader2 className="size-7 animate-spin" />
         </div>
+      ) : ordersError && !orders ? (
+        <div className="surface rounded-3xl p-8 text-center text-sm text-cream-300">
+          Could not load orders.
+          <button onClick={() => void refetchOrders()} className="btn-ghost focus-ring mt-3 block min-h-[48px] w-full rounded-2xl">
+            Try again
+          </button>
+        </div>
       ) : shown.length === 0 ? (
         <div className="surface rounded-3xl p-8 text-center text-sm text-cream-300">
           {filter === 'active' ? 'No orders waiting. New paid orders appear here instantly.' : 'Nothing collected yet.'}
@@ -140,7 +169,8 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
       ) : (
         <ul className="space-y-3">
           {shown.map((o) => {
-            const lines = decodeOrder(o.details)
+            const check = verifyOrder(o.details, o.amount)
+            const lines = check.lines
             const next = NEXT[o.status]
             const busy = pending === o.id
             return (
@@ -170,18 +200,28 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
                         {l.sizeLabel} · {l.spiceLabel}
                         {l.extraLabels.length > 0 && ` · ${l.extraLabels.join(', ')}`}
                       </span>
-                      {l.note && <div className="text-xs italic text-gold-300">"{l.note}"</div>}
+                      {l.note && <div className="break-words text-xs italic text-gold-300">"{l.note}"</div>}
                     </li>
                   ))}
                 </ul>
+                {!check.ok && (
+                  <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-gold-400/40 bg-gold-400/10 p-3 text-xs text-gold-300">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                      {check.reason === 'unreadable'
+                        ? 'Some items could not be read. Check with the customer before preparing.'
+                        : `Paid ${usd(o.amount)} USDC but these items cost ${usd(check.expected)} USDC at menu prices.`}
+                    </span>
+                  </div>
+                )}
                 {next && (
                   <button
                     onClick={() => void advance(o)}
                     disabled={pending !== null}
-                    className="btn-primary focus-ring mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm"
+                    className={`focus-ring mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm ${check.ok ? 'btn-primary' : 'btn-ghost'}`}
                   >
                     {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                    {busy ? 'Updating…' : next.label}
+                    {busy ? 'Updating…' : check.ok ? next.label : `${next.label} anyway`}
                   </button>
                 )}
               </li>
@@ -189,6 +229,8 @@ export function SellerView({ onOpen }: { onOpen: (id: bigint) => void }) {
           })}
         </ul>
       )}
+
+      <ShopSettings pending={pendingShop} />
     </div>
   )
 }
@@ -203,7 +245,7 @@ function Stat({ label, value, suffix }: { label: string; value: string; suffix?:
   )
 }
 
-function Gate(props: { icon: React.ReactNode; title: string; body: string; action?: string; onAction?: () => void }) {
+function Gate(props: { icon: React.ReactNode; title: string; body: string; action?: string; onAction?: () => void; extra?: React.ReactNode }) {
   return (
     <div className="surface mt-6 flex flex-col items-center rounded-3xl px-6 py-12 text-center">
       <span className="flex size-14 items-center justify-center rounded-full bg-ember-500/15 text-ember-400">{props.icon}</span>
@@ -214,6 +256,7 @@ function Gate(props: { icon: React.ReactNode; title: string; body: string; actio
           {props.action}
         </button>
       )}
+      {props.extra}
     </div>
   )
 }

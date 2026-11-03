@@ -9,8 +9,8 @@ import { Sheet } from '@/components/Sheet'
 import { useCart } from '@/hooks/useCart'
 import { useCheckout, type CheckoutPhase } from '@/hooks/useCheckout'
 import { useUsdcBalance } from '@/hooks/useShop'
-import { CHAIN_ID, CHAIN_NAME, SHOP_ADDRESS, txUrl } from '@/lib/chain'
-import { usd } from '@/lib/format'
+import { CHAIN_ID, CHAIN_NAME, GAS_RESERVE, MAX_ORDER_RAW, SHOP_ADDRESS, txUrl } from '@/lib/chain'
+import { formatUsdcShort, usd } from '@/lib/format'
 import { MAX_DETAILS_BYTES, encodedSize, getItem, getSize, lineTotal, SPICE_LEVELS, getExtra, prepMinutes } from '@/lib/menu'
 
 interface CartSheetProps {
@@ -21,6 +21,7 @@ interface CartSheetProps {
 
 const PHASE_COPY: Record<CheckoutPhase, string> = {
   idle: '',
+  checking: 'Checking your balance…',
   switching: `Switching to ${CHAIN_NAME}…`,
   approving: 'Confirm the USDC allowance in your wallet…',
   'approving-confirm': 'Waiting for the allowance to confirm…',
@@ -36,7 +37,8 @@ export function CartSheet({ open, onClose, onPaid }: CartSheetProps) {
   const { pay, phase, busy, error, approveHash } = useCheckout()
 
   const tooLong = encodedSize(lines) > MAX_DETAILS_BYTES
-  const short = isConnected && balance !== undefined && balance < total
+  const tooBig = total > MAX_ORDER_RAW
+  const short = isConnected && balance !== undefined && balance < total + GAS_RESERVE
   const wrongChain = isConnected && chainId !== CHAIN_ID
 
   const onPay = async () => {
@@ -87,7 +89,7 @@ export function CartSheet({ open, onClose, onPaid }: CartSheetProps) {
             )}
             <button
               onClick={() => void onPay()}
-              disabled={!SHOP_ADDRESS || busy || tooLong || (isConnected && short)}
+              disabled={!SHOP_ADDRESS || busy || tooLong || tooBig || (isConnected && short)}
               className="btn-primary focus-ring flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl px-4 text-base"
             >
               {busy && <Loader2 className="size-5 animate-spin" />}
@@ -187,13 +189,19 @@ export function CartSheet({ open, onClose, onPaid }: CartSheetProps) {
             </div>
           </div>
 
+          {tooBig && (
+            <p className="text-sm text-chili-500">
+              Orders are limited to {formatUsdcShort(MAX_ORDER_RAW)} USDC. Remove something or split it into two orders.
+            </p>
+          )}
+
           {tooLong && (
             <p className="text-sm text-chili-500">This order is too long to record. Shorten a note or remove an item.</p>
           )}
 
           {short && (
             <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 p-3.5 text-sm text-gold-300">
-              You have {balance !== undefined ? usd(balance) : '0.00'} USDC, which does not cover this order. Use the{' '}
+              You have {balance !== undefined ? usd(balance) : '0.00'} USDC, which does not cover this order plus about 0.05 USDC for network fees. Use the{' '}
               <strong>Get test USDC</strong> button in the Arc Studio sidebar, or{' '}
               <a
                 href="https://faucet.circle.com"

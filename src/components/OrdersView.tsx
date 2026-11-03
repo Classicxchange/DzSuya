@@ -17,7 +17,7 @@ const STATUS_STYLE = [
 export function OrdersView({ onOpen, onBrowse }: { onOpen: (id: bigint) => void; onBrowse: () => void }) {
   const { address, isConnected } = useAccount()
   const { setOpen } = useModal()
-  const { orders, isLoading } = useMyOrders(address)
+  const { orders, isLoading, isError, refetch } = useMyOrders(address)
 
   if (!isConnected) {
     return (
@@ -40,6 +40,18 @@ export function OrdersView({ onOpen, onBrowse }: { onOpen: (id: bigint) => void;
       <div className="flex justify-center py-24 text-ember-400">
         <Loader2 className="size-7 animate-spin" />
       </div>
+    )
+  }
+
+  if (isError && !orders) {
+    return (
+      <Empty
+        icon={<ReceiptText className="size-7" />}
+        title="Could not load your orders"
+        body="The network did not answer. Your orders are safe onchain."
+        action="Try again"
+        onAction={() => void refetch()}
+      />
     )
   }
 
